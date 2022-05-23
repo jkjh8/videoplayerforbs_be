@@ -9,9 +9,9 @@ const formidable = require('formidable')
 router.get('/', async (req, res) => {
   const { dir } = req.query
   const files = []
-  let targetPath = mediaPath
+  let targetPath = mediaFolder
   if (dir) {
-    targetPath = path.join(mediaPath, dir)
+    targetPath = path.join(mediaFolder, dir)
   }
   const r = fs.readdirSync(targetPath)
   for (let i = 0; i < r.length; i++) {
@@ -27,11 +27,15 @@ router.get('/', async (req, res) => {
 })
 
 router.post('/upload', (req, res) => {
-  const form = new formidable.IncomingForm()
-  form.uploadDir = mediaPath
+  const form = new formidable.IncomingForm({
+    maxFileSize: 4000 * 1024 * 1024,
+    maxFields: 0,
+    maxFieldsSize: 200 * 1024 * 1024
+  })
+  form.uploadDir = mediaFolder
   form.on('field', (field, value) => {
     if (field === 'path') {
-      form.uploadDir = path.join(mediaPath, value)
+      form.uploadDir = path.join(mediaFolder, value)
     }
   })
   form.parse(req, (_, fields, files) => {
@@ -39,11 +43,32 @@ router.post('/upload', (req, res) => {
     keys.forEach((key) => {
       fs.renameSync(
         files[key].filepath,
-        mediaPath + '/' + files[key].originalFilename
+        mediaFolder + '/' + files[key].originalFilename
       )
     })
     res.status(200).send('Thank you')
   })
+})
+
+router.get('/mkdir', (req, res) => {
+  try {
+    const { name } = req.query
+    fs.mkdirSync(path.join(mediaFolder, name))
+    res.status(200).send('OK')
+  } catch (err) {
+    res.status(500).json({ error: err })
+  }
+})
+
+router.get('/deleteFile', (req, res) => {
+  try {
+    const { name } = req.query
+    console.log(path.join(mediaFolder, name))
+    fs.unlinkSync(path.join(mediaFolder, name))
+    res.status(200).send('OK')
+  } catch (err) {
+    res.status(500).json({ error: err })
+  }
 })
 
 module.exports = router

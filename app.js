@@ -6,6 +6,7 @@ var path = require('path')
 var cookieParser = require('cookie-parser')
 var logger = require('morgan')
 const cors = require('cors')
+const fs = require('fs')
 
 var indexRouter = require('./routes/index')
 const apiRouter = require('./routes/api')
@@ -16,9 +17,15 @@ app.use(logger('dev'))
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
-app.use(express.static(path.join(__dirname, 'public')))
-global.mediaPath = path.join(__dirname, 'media')
-app.use('/media', express.static(mediaPath))
+
+// make folder
+global.publicFolder = path.join(__dirname, 'public')
+global.mediaFolder = path.join(__dirname, 'media')
+!fs.existsSync(publicFolder) && fs.mkdirSync(publicFolder)
+!fs.existsSync(mediaFolder) && fs.mkdirSync(mediaFolder)
+
+app.use(express.static(publicFolder))
+app.use('/media', express.static(mediaFolder))
 
 // cors
 app.use(
@@ -52,5 +59,5 @@ app.use(function (req, res, next) {
 //   res.status(err.status || 500)
 //   res.render('error')
 // })
-
+global.app = app
 module.exports = app
