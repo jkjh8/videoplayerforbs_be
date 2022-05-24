@@ -17,7 +17,12 @@ function parser(args) {
   switch (args.command) {
     case 'playDirect':
       updateSource(args.file)
-      app.io.emit('player', { command: 'play' })
+      if (
+        args.file.type.includes('video') ||
+        args.file.type(includes('audio'))
+      ) {
+        app.io.emit('player', { command: 'play' })
+      }
       break
     case 'clear':
       app.io.emit('player', { command: 'clear' })

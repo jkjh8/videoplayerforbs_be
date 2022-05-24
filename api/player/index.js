@@ -11,5 +11,5 @@ const playerStatus = {
 
 module.exports.updateSource = (file) => {
   playerStatus.source = file
-  app.io.emit('player', { command: 'updateSource', file: file })
+  app.io.emit('source', { file: file })
 }
