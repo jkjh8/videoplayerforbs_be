@@ -39,7 +39,7 @@ app.use(
 
 // socket io
 app.io = require('socket.io')()
-require('./api/socketio')(app)
+require('./api/socketio')(app.io)
 
 app.use('/', indexRouter)
 app.use('/api', apiRouter)
@@ -59,5 +59,4 @@ app.use(function (req, res, next) {
 //   res.status(err.status || 500)
 //   res.render('error')
 // })
-global.app = app
 module.exports = app
