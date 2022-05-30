@@ -71,4 +71,18 @@ router.get('/deleteFile', (req, res) => {
   }
 })
 
+router.post('/exist', (req, res) => {
+  try {
+    const { name } = req.body
+    const file = path.join(mediaFolder, name)
+    if (fs.existsSync(file)) {
+      return res.status(200).json({ result: true })
+    } else {
+      return res.status(200).json({ result: false })
+    }
+  } catch (err) {
+    res.status(500).json({ error: err })
+  }
+})
+
 module.exports = router

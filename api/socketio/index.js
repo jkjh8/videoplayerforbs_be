@@ -1,48 +1,27 @@
 const { updateSource } = require('../player')
-const players = []
+let _status = {}
 
 exports = module.exports = (io) => {
-  const status = io.of('/status')
-  const player = io.of('/player')
-
-  status.on('connection', (socket) => {
+  io.on('connection', (socket) => {
     console.log('Status Connected Socket ', socket.id)
 
     socket.on('disconnect', () => {
       console.log('Status Disconnected Socket', socket.id)
     })
-
     socket.on('data', (args) => {
-      socket.broadcast.emit('data', args)
-    })
-  })
-
-  player.on('connection', (socket) => {
-    players.push(socket.id)
-    console.log('Player Connected Socket ', socket.id)
-
-    socket.on('disconnect', () => {
-      players.remove(socket.id)
-      console.log('Player Disconnected Socket', socket.id)
-    })
-
-    socket.on('data', (args) => {
-      if (players.length) {
-        socket.broadcast.emit('data', args)
+      if (_status.file !== args.file) {
+        _status = args
+        _status.ready = false
       } else {
-        socket.emit('error', 'No Player')
+        _status = args
       }
+      socket.broadcast.emit('data', _status)
     })
-  })
-
-  io.on('connection', (socket) => {
-    console.log('connected ', socket.id)
-
-    socket.on('disconnect', () => {
-      console.log('disconnect ', socket.id)
+    socket.on('get', () => {
+      socket.emit('data', _status)
     })
-    socket.on('playerFunction', (args) => {
-      parser(args)
+    socket.on('command', (args) => {
+      socket.broadcast.emit('command', args)
     })
   })
 }
