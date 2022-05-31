@@ -23,4 +23,13 @@ router.get('/', (req, res) => {
   }
 })
 
+router.put('/', (req, res) => {
+  try {
+    const { playlist } = req.body
+    fs.writeFileSync('playlist.json', JSON.stringify(playlist))
+    res.status(200).json({ playlist: playlist })
+  } catch (err) {
+    res.status(500).json({ error: err })
+  }
+})
 module.exports = router
