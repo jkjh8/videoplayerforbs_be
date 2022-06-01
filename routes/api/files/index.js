@@ -19,6 +19,7 @@ router.get('/', async (req, res) => {
     files.push({
       name: r[i],
       directory: stat.isDirectory(),
+      path: path.join(targetPath, r[i]),
       size: stat.size,
       createdAt: stat.birthtime
     })

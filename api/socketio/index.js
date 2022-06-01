@@ -9,11 +9,9 @@ exports = module.exports = (io) => {
       console.log('Status Disconnected Socket', socket.id)
     })
     socket.on('data', (args) => {
-      if (_status.file !== args.file) {
-        _status = args
-        _status.ready = false
-      } else {
-        _status = args
+      _status = { ...args }
+      if (args.command === 'ended') {
+        io.emit('command', { command: 'stop' })
       }
       socket.broadcast.emit('data', _status)
     })
