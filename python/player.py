@@ -54,18 +54,25 @@ class PlayerWindow(QMainWindow):
             "play_mode": "Nomal",
             "status": str(self.mediaplayer.get_state()),
             "volume": int(self.mediaplayer.audio_get_volume()),
-            "mute": bool(self.mediaplayer.audio_get_mute())
+            "mute": bool(self.mediaplayer.audio_get_mute()),
+            "end_of_list": 0,
+            "play_index": 0,
+            "repeat_one": False,
+            "repeat_all": False
         }
+        self.playlist = []
         self.setupUi()
         
         # self.io.status.connect(self.recv_status)
         self.io.command.connect(self.recv_comm)
+        self.io.get_connected.connect(self.rt_status)
         self.timer.timeout.connect(self.update_status)
         self.status.connect(self.io.send_status)
         self.message.connect(self.io.send_message)
         self.error.connect(self.io.send_error)
         
         self.load_setup_from_file()
+        self.load_playlist_from_file()
         self.io.start()
         
     def save_setup_to_file(self):
@@ -74,24 +81,40 @@ class PlayerWindow(QMainWindow):
                 "fullscreen": self._status['fullscreen'],
                 "play_mode": self._status['play_mode'],
                 "volume": self._status['volume'],
-                "mute": self._status['mute']
+                "mute": self._status['mute'],
+                "play_mode": self._status['play_mode'],
+                "repeat_one": self._status['repeat_one'],
+                "repeat_all": self._status['repeat_all'],
             }, make_file, indent="\t")
             
     def load_setup_from_file(self):
-        if os.path.isfile('./setup.json'):
-            with open('./setup.json', 'r') as f:
-                json_data = json.load(f)
-                print(json_data)
-                if json_data['fullscreen']:
-                    self._status['fullscreen'] = json_data['fullscreen']
-                if json_data['play_mode']:
-                    self._status['play_mode'] = json_data['play_mode']
-                if json_data["volume"]:
-                    self._status['volume'] = json_data['volume']
-                if json_data["mute"]:
-                    self._status['mute'] = json_data['mute']
-        self.rt_status()
-                
+        try:
+            if os.path.isfile('./setup.json'):
+                with open('./setup.json', 'r') as f:
+                    json_data = json.load(f)
+                    if 'fullscreen' in json_data:
+                        self.set_fullscreen(json_data['fullscreen'])
+                    if 'play_mode' in json_data:
+                        self.set_play_mode(json_data['play_mode'])
+                    if "volume" in json_data:
+                        self.set_volume(json_data['volume'])
+                    if "mute" in json_data:
+                        self.set_mute(json_data['mute'])
+                    if "repeat_all" in json_data:
+                        self.set_repeat_all(json_data['repeat_all'])
+                    if "repeat_one" in json_data:
+                        self.set_repeat_one(json_data['repeat_one'])
+        except Exception as e:
+            print(e)
+    
+    def load_playlist_from_file(self):
+        if os.path.isfile('./playlist.json'):
+            with open('./playlist.json', 'r') as f:
+                self.update_playlist(json.load(f))
+    
+    def update_playlist(self, plist):
+        self.playlist = plist
+        self._status['end_of_list'] = len(plist)
 
     def setupUi(self):
         self.setWindowIcon(QIcon('./python/logo.png'))
@@ -109,17 +132,20 @@ class PlayerWindow(QMainWindow):
         if self.mediaplayer.is_playing():
             self.mediaplayer.pause()
             self._status['paused'] = True
-            self.rt_status()
-            
         else:
             if self.mediaplayer.play() == -1:
                 self._status['paused'] = False
+                if self._status['status'] == "State.Stopped" and "file" in self._status:
+                    self.open_file(self._status['file'])
                 self.rt_status()
                 return
             self._status['paused'] = False
             self.mediaplayer.play()
             self.timer.start()
-            self.rt_status()
+        
+        self.rt_status()
+        if "index" in self._status["file"]:
+            self._status["play_index"] = self._status["file"]["index"]
     
     def stop(self):
         self.mediaplayer.stop()
@@ -155,7 +181,7 @@ class PlayerWindow(QMainWindow):
         
     def set_position(self, position):
         self.timer.stop()
-        self.mediaplayer.set_position(position/1000)
+        self.mediaplayer.set_time(position * 1000)
         self.timer.start()
         
     def set_fullscreen(self, value):
@@ -188,21 +214,45 @@ class PlayerWindow(QMainWindow):
             self.save_setup_to_file()
         except Exception as e:
             self.error.emit({"command":"set_volume", "message":e})
+            
+    def set_play_mode(self, mode):
+        try:
+            self._status["play_mode"] = mode
+            self.rt_status()
+            self.save_setup_to_file()
+        except Exception as e:
+            self.error.emit({"command":"set_volume", "message":e})
+    
+    def set_repeat_one(self, value):
+        try:
+            self._status["repeat_one"] = value
+            self.rt_status()
+            self.save_setup_to_file()
+        except Exception as e:
+            self.error.emit({"command":"set_volume", "message":e})
+    
+    def set_repeat_all(self, value):
+        try:
+            self._status["repeat_all"] = value
+            self.rt_status()
+            self.save_setup_to_file()
+        except Exception as e:
+            self.error.emit({"command":"set_volume", "message":e})
         
     def update_status(self):
         self._status['position'] = int(self.mediaplayer.get_position() * 1000)
         self._status['duration'] = int(self.mediaplayer.get_length() / 1000)
         self._status['curTime'] = int(self.mediaplayer.get_time() / 1000)
-        self.rt_status()
         
         if not self.mediaplayer.is_playing():
             self.timer.stop()
-            
             if not self._status['paused']:
                 self.stop()
+        self.rt_status()
         
     @Slot(object)
     def recv_comm(self, data):
+        print(data)
         if data["command"] == "playPause":
             self.play_pause()
         elif data["command"] == "stop":
@@ -219,6 +269,14 @@ class PlayerWindow(QMainWindow):
             self.set_volume(data["value"])
         elif data["command"] == "set_mute":
             self.set_mute(data["value"])
+        elif data["command"] == "update_playlist":
+            self.update_playlist(data["playlist"])
+        elif data["command"] == "set_play_mode":
+            self.set_play_mode(data["value"])
+        elif data["command"] == "set_repeat_all":
+            self.set_repeat_all(data["value"])
+        elif data["command"] == "set_repeat_one":
+            self.set_repeat_one(data["value"])
         else:
             self.error.emit({ "command":"unknown_command", "command":"unknown_command" })
         # self.rt_status()
@@ -227,11 +285,15 @@ class IO(QThread):
     sio = socketio.Client()
     command = Signal(object)
     status = Signal(object)
+    get_connected = Signal()
     def __init__(self, parent=None):
         super(IO, self).__init__(parent)
+        self.connected = False
         
     def call_connect(self):
-        print('connection established')
+        self.connected = True
+        self.get_connected.emit()
+        print('connected')
 
     def call_command(self, args):
         self.command.emit(args)
@@ -241,26 +303,36 @@ class IO(QThread):
         self.status.emit(args)
         
     def call_disconnect(self):
-        print('disconnected from server')
+        self.connected = False
+        print('disconnected')
     
     @Slot()
     def send_status(self, args):
-        IO.sio.emit('status', args)
+        if self.connected:
+            IO.sio.emit('status', args)
+        else:
+            print('socket io not connected')
     
     @Slot()
     def send_error(self, args):
-        IO.sio.emit('error', args)
+        if self.connected:
+            IO.sio.emit('error', args)
+        else:
+            print('socket io not connected')
         
     @Slot()
     def send_message(serf, args):
-        IO.sio.emit('message', args)
+        if self.connected:
+            IO.sio.emit('message', args)
+        else:
+            print('socket io not connected')
 
     def run(self):
         IO.sio.on('data', self.call_status)
         IO.sio.on('command', self.call_command)
         IO.sio.on('connect', self.call_connect)
         IO.sio.on('disconnect', self.call_disconnect)
-        IO.sio.connect('http://localhost:3000')
+        IO.sio.connect('http://localhost:3000?client=player')
 
 if __name__=="__main__":
     app = QApplication(sys.argv)
