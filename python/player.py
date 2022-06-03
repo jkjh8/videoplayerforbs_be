@@ -51,6 +51,7 @@ class PlayerWindow(QMainWindow):
         self._status = {
             "paused": False,
             "fullscreen": False,
+            "play_mode": "Nomal",
             "status": str(self.mediaplayer.get_state()),
             "volume": int(self.mediaplayer.audio_get_volume()),
             "mute": bool(self.mediaplayer.audio_get_mute())
@@ -64,8 +65,33 @@ class PlayerWindow(QMainWindow):
         self.message.connect(self.io.send_message)
         self.error.connect(self.io.send_error)
         
-        
+        self.load_setup_from_file()
         self.io.start()
+        
+    def save_setup_to_file(self):
+        with open('./setup.json', 'w', encoding='utf-8') as make_file:
+            json.dump({
+                "fullscreen": self._status['fullscreen'],
+                "play_mode": self._status['play_mode'],
+                "volume": self._status['volume'],
+                "mute": self._status['mute']
+            }, make_file, indent="\t")
+            
+    def load_setup_from_file(self):
+        if os.path.isfile('./setup.json'):
+            with open('./setup.json', 'r') as f:
+                json_data = json.load(f)
+                print(json_data)
+                if json_data['fullscreen']:
+                    self._status['fullscreen'] = json_data['fullscreen']
+                if json_data['play_mode']:
+                    self._status['play_mode'] = json_data['play_mode']
+                if json_data["volume"]:
+                    self._status['volume'] = json_data['volume']
+                if json_data["mute"]:
+                    self._status['mute'] = json_data['mute']
+        self.rt_status()
+                
 
     def setupUi(self):
         self.setWindowIcon(QIcon('./python/logo.png'))
@@ -125,6 +151,7 @@ class PlayerWindow(QMainWindow):
     def set_volume(self, volume):
         self.mediaplayer.audio.set_volume(volume)
         self._status['volume'] = volume
+        self.save_setup_to_file()
         
     def set_position(self, position):
         self.timer.stop()
@@ -140,8 +167,27 @@ class PlayerWindow(QMainWindow):
             else:
                 self.showNormal()
             self.rt_status()
+            self.save_setup_to_file()
         except Exception as e:
             self.error.emit({"command": "set_fullscreen", "message": e})   
+        
+    def set_mute(self, value):
+        try:
+            self.mediaplayer.audio_set_mute(value)
+            self._status['mute'] = value
+            self.rt_status()
+            self.save_setup_to_file()
+        except Exception as e:
+            self.error.emit({"command": "set_mute", "message": e})
+    
+    def set_volume(self, value):
+        try:
+            self.mediaplayer.audio_set_volume(value)
+            self._status["volume"] = value
+            self.rt_status()
+            self.save_setup_to_file()
+        except Exception as e:
+            self.error.emit({"command":"set_volume", "message":e})
         
     def update_status(self):
         self._status['position'] = int(self.mediaplayer.get_position() * 1000)
@@ -155,92 +201,28 @@ class PlayerWindow(QMainWindow):
             if not self._status['paused']:
                 self.stop()
         
-    
-
-
-        
-    # def set_position(self, value):
-    #     try:
-    #         self.player.set_position(value)
-    #         self.rt_status('set_position')
-    #     except:
-    #         self.rt_error('set_position')
-    #         pass
-        
-    # def setFullScreen(self, value):
-    #     try:
-    #         self.player.set_fullscreen(value)
-    #         if value == True:
-    #             self.showFullScreen()
-    #             _status['isFullscreen'] = True
-    #         else:
-    #             self.showNormal()
-    #             _status['isFullscreen'] = False
-    #         self.rt_status("set_fullscreen")
-    #     except:
-    #         self.rt("set_fullscreen")
-    #         pass
-    
-    # def getStatus(self):
-    #     try:
-    #         if (self.player):
-    #             _status['type'] = "status"
-    #             _status['command'] = 'get_status'
-    #             _status['status'] = str(self.player.get_state())
-    #             _status['playing'] = self.player.is_playing()
-    #             _status['volume'] = self.player.audio_get_volume()
-    #             _status['mute'] = self.player.audio_get_mute()
-    #             # _status['scale'] = self.player.video_get_scale(),
-    #             _status['curTime'] = self.player.get_time()
-    #             if _status['curTime'] < 0:
-    #                 _status['curTime'] = 0
-    #             _status['duration'] = self.player.get_length()
-    #             if _status['duration'] < 0:
-    #                 _status['duration'] = 0
-    #             _status['position'] = self.player.get_position()
-    #             if _status['position'] < 0:
-    #                 _status['position'] = 0
-    #             # _status['rate'] = self.player.get_rate(),
-    #     except Exception as e:
-    #         print(e)
-    #         self.rt_error('get_status')
-    #         pass
-   
-        
-    # # player callback event  
-    # def finished(self, _event):
-    #     self.setWindowTitle("Video Player For BS")
-    #     self.rt_status('ended')
-
-    # def get_media_length(self, event):
-    #     # _status['duration'] = round(self.player.get_length() / 1000)
-    #     self.rt_status('duration')
-    
-    # def play_time_change(self, event):
-    #     # _status['curTime'] = round(self.player.get_time() / 1000)
-    #     # _status['positon'] = round(self.player.get_position(),3)
-    #     self.rt_status('current_time')
-     
-        
     @Slot(object)
     def recv_comm(self, data):
-        print(data)
-        self.data = data
-        if self.data["command"] == "playPause":
+        if data["command"] == "playPause":
             self.play_pause()
-        elif self.data["command"] == "stop":
+        elif data["command"] == "stop":
             self.stop()
-        elif self.data["command"] == "open_file":
-            self.open_file(self.data["file"])
-        elif self.data["command"] == "fullscreen":
-            self.set_fullscreen(self.data['value'])
-        elif self.data["command"] == "status":
+        elif data["command"] == "open_file":
+            self.open_file(data["file"])
+        elif data["command"] == "set_fullscreen":
+            self.set_fullscreen(data['value'])
+        elif data["command"] == "get_status":
             self.rt_status()
-        elif self.data["command"] == "setposition":
-            self.set_position(self.data["value"])
+        elif data["command"] == "set_position":
+            self.set_position(data["value"])
+        elif data["command"] == "set_volume":
+            self.set_volume(data["value"])
+        elif data["command"] == "set_mute":
+            self.set_mute(data["value"])
         else:
             self.error.emit({ "command":"unknown_command", "command":"unknown_command" })
-        self.rt_status()
+        # self.rt_status()
+        
 class IO(QThread):
     sio = socketio.Client()
     command = Signal(object)

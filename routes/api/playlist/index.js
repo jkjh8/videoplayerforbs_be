@@ -4,21 +4,19 @@ const router = express.Router()
 const path = require('path')
 const fs = require('fs')
 
-let playlist = []
-
-fs.exists('playlist.json', (exists) => {
-  if (exists) {
-    const pl = fs.readFileSync('playlist.json', 'utf8')
-    playlist = JSON.parse(pl)
-  } else {
-    fs.writeFileSync('playlist.json', JSON.stringify(playlist))
-  }
-})
-
 router.get('/', (req, res) => {
   try {
+    const playlist = []
+    let pl
+    if (fs.existsSync('./playlist.json')) {
+      pl = JSON.parse(fs.readFileSync('./playlist.json', 'utf-8'))
+    }
+    for (let i = 0; i < pl.length; i++) {
+      playlist.push({ ...pl[i], exist: fs.existsSync(pl[i].path) })
+    }
     res.status(200).json({ playlist: playlist })
   } catch (err) {
+    console.log(err)
     res.status(500).json({ error: err })
   }
 })
@@ -26,7 +24,7 @@ router.get('/', (req, res) => {
 router.put('/', (req, res) => {
   try {
     const { playlist } = req.body
-    fs.writeFileSync('playlist.json', JSON.stringify(playlist))
+    fs.writeFileSync('./playlist.json', JSON.stringify(playlist))
     res.status(200).json({ playlist: playlist })
   } catch (err) {
     res.status(500).json({ error: err })

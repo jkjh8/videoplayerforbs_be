@@ -20,6 +20,7 @@ exports = module.exports = (io) => {
       socket.emit('data', _status)
     })
     socket.on('command', (args) => {
+      console.log(args)
       socket.broadcast.emit('command', args)
     })
     socket.on('error', (args) => {
