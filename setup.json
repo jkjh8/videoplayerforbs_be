@@ -3,6 +3,6 @@
 	"play_mode": "Normal",
 	"volume": 100,
 	"mute": false,
-	"repeat_one": false,
+	"repeat_one": true,
 	"repeat_all": false
 }

@@ -1,5 +1,5 @@
 import vlc
-import sys, os, platform, json
+import sys, os, platform, json, time
 from PySide2.QtWidgets import QApplication, QWidget, QMainWindow
 from PySide2.QtCore import Slot, Signal, QThread, QTimer
 from PySide2.QtGui import QIcon
@@ -43,7 +43,7 @@ class PlayerWindow(QMainWindow):
         self.setWindowTitle("Video Player For BS")
         self.io = IO() # socket.io
         self.timer = QTimer(self)
-        self.timer.setInterval(1000)
+        self.timer.setInterval(500)
         self.instance = vlc.Instance()
         self.media = None
         
@@ -134,20 +134,22 @@ class PlayerWindow(QMainWindow):
             self._status['paused'] = True
         else:
             if self.mediaplayer.play() == -1:
-                self._status['paused'] = False
                 if self._status['status'] == "State.Stopped" and "file" in self._status:
                     self.open_file(self._status['file'])
-                self.rt_status()
-                return
             self._status['paused'] = False
             self.mediaplayer.play()
             self.timer.start()
+            if 'image' in self._status['file']["type"]:
+                self.mediaplayer.pause()
+                self._status['paused'] = True
+                print('image')
         
         self.rt_status()
         if "index" in self._status["file"]:
             self._status["play_index"] = self._status["file"]["index"]
     
     def stop(self):
+        self.timer.stop()
         self.mediaplayer.stop()
         self.rt_status()
         
@@ -168,8 +170,9 @@ class PlayerWindow(QMainWindow):
                 self.mediaplayer.set_hwnd(int(self.winId()))
             elif platform.system() == "Darwin": # for MacOS
                 self.mediaplayer.set_nsobject(int(self.winId()))
-
-            self.play_pause()
+            
+            # self.update_status()
+            # self.play_pause()
         
         except Exception as e:
             self.error.emit({'command': "open_file", "message": e})
@@ -247,18 +250,30 @@ class PlayerWindow(QMainWindow):
         if not self.mediaplayer.is_playing():
             self.timer.stop()
             if not self._status['paused']:
-                self.stop()
+                if self._status['repeat_one']:
+                    self.stop()
+                    return self.play_pause()
+                else:
+                    self.stop()
         self.rt_status()
         
     @Slot(object)
     def recv_comm(self, data):
         print(data)
-        if data["command"] == "playPause":
+        if data["command"] == "play_pause":
             self.play_pause()
         elif data["command"] == "stop":
             self.stop()
         elif data["command"] == "open_file":
             self.open_file(data["file"])
+            self.play_pause()
+            self.timer.stop()
+            time.sleep(.1)
+            self.mediaplayer.pause()
+            self._status['paused'] = True
+        elif data["command"] == "play_direct":
+            self.open_file(data["file"])
+            self.play_pause()
         elif data["command"] == "set_fullscreen":
             self.set_fullscreen(data['value'])
         elif data["command"] == "get_status":
@@ -321,7 +336,7 @@ class IO(QThread):
             print('socket io not connected')
         
     @Slot()
-    def send_message(serf, args):
+    def send_message(self, args):
         if self.connected:
             IO.sio.emit('message', args)
         else:
