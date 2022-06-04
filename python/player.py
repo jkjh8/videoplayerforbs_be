@@ -14,27 +14,6 @@ import socketio
 #  5: 'Stopped',
 #  6: 'Ended',
 #  7: 'Error'}
-
-# _status = {
-#     "type": "status",
-#     "command": "status",
-#     "status": 0,
-#     "isFullscreen": False,
-#     "duration": 0,
-#     "curTime": 0,
-#     "position": 0,
-#     "os": None,
-#     "file": None,
-#     "volume": None,
-#     "mute": False,
-#     # "scale": None,
-#     # "rate": None,
-#     "loop": False,
-#     "loopAll": False,
-#     "playMode": 'Nomal',
-#     "playing": 0
-# }
-
  
 class PlayerWindow(QMainWindow):
     sender = Signal(object); status = Signal(object); error = Signal(object); message = Signal(object)
@@ -43,9 +22,17 @@ class PlayerWindow(QMainWindow):
         self.setWindowTitle("Video Player For BS")
         self.io = IO() # socket.io
         self.timer = QTimer(self)
-        self.timer.setInterval(500)
+        self.timer.setInterval(1000)
         self.instance = vlc.Instance()
         self.media = None
+        
+        self.io.command.connect(self.recv_comm)
+        self.io.get_connected.connect(self.rt_status)
+        self.timer.timeout.connect(self.update_status)
+        self.status.connect(self.io.send_status)
+        self.message.connect(self.io.send_message)
+        self.error.connect(self.io.send_error)
+        self.io.start()
         
         self.mediaplayer = self.instance.media_player_new()
         self._status = {
@@ -63,17 +50,9 @@ class PlayerWindow(QMainWindow):
         self.playlist = []
         self.setupUi()
         
-        # self.io.status.connect(self.recv_status)
-        self.io.command.connect(self.recv_comm)
-        self.io.get_connected.connect(self.rt_status)
-        self.timer.timeout.connect(self.update_status)
-        self.status.connect(self.io.send_status)
-        self.message.connect(self.io.send_message)
-        self.error.connect(self.io.send_error)
         
         self.load_setup_from_file()
         self.load_playlist_from_file()
-        self.io.start()
         
     def save_setup_to_file(self):
         with open('./setup.json', 'w', encoding='utf-8') as make_file:
@@ -134,23 +113,21 @@ class PlayerWindow(QMainWindow):
             self._status['paused'] = True
         else:
             if self.mediaplayer.play() == -1:
-                if self._status['status'] == "State.Stopped" and "file" in self._status:
+                if self._status["play_mode"] == "Playlist":
+                    self.open_file(self.playlist[self._status["play_index"]])
+                elif self._status['status'] == "State.Stopped" and "file" in self._status:
                     self.open_file(self._status['file'])
             self._status['paused'] = False
             self.mediaplayer.play()
             self.timer.start()
-            if 'image' in self._status['file']["type"]:
-                self.mediaplayer.pause()
-                self._status['paused'] = True
-                print('image')
-        
         self.rt_status()
-        if "index" in self._status["file"]:
-            self._status["play_index"] = self._status["file"]["index"]
-    
+
     def stop(self):
         self.timer.stop()
         self.mediaplayer.stop()
+        self._status['position'] = 0
+        self._status['duration'] = 0
+        self._status['curTime'] = 0
         self.rt_status()
         
     def open_file(self, file):
@@ -161,8 +138,8 @@ class PlayerWindow(QMainWindow):
             self._status['file'] = file
             self.media = self.instance.media_new(file['path'])
             self.mediaplayer.set_media(self.media)
-            self.media.parse()
-            print(self.media.get_meta(0))
+            # self.media.parse()
+            # print(self.media.get_meta(0))
             
             if platform.system() == "Linux": # for Linux using the X Server
                 self.mediaplayer.set_xwindow(int(self.winId()))
@@ -170,12 +147,16 @@ class PlayerWindow(QMainWindow):
                 self.mediaplayer.set_hwnd(int(self.winId()))
             elif platform.system() == "Darwin": # for MacOS
                 self.mediaplayer.set_nsobject(int(self.winId()))
+                
+            self._status['position'] = int(self.mediaplayer.get_position() * 1000)
+            self._status['duration'] = int(self.mediaplayer.get_length() / 1000)
+            self._status['curTime'] = int(self.mediaplayer.get_time() / 1000)
             
-            # self.update_status()
+            self.rt_status()
             # self.play_pause()
         
         except Exception as e:
-            self.error.emit({'command': "open_file", "message": e})
+            self.error.emit({'command': "open_file", "message": str(e)})
         
     def set_volume(self, volume):
         self.mediaplayer.audio.set_volume(volume)
@@ -198,7 +179,7 @@ class PlayerWindow(QMainWindow):
             self.rt_status()
             self.save_setup_to_file()
         except Exception as e:
-            self.error.emit({"command": "set_fullscreen", "message": e})   
+            self.error.emit({"command": "set_fullscreen", "message": str(e)})   
         
     def set_mute(self, value):
         try:
@@ -207,7 +188,7 @@ class PlayerWindow(QMainWindow):
             self.rt_status()
             self.save_setup_to_file()
         except Exception as e:
-            self.error.emit({"command": "set_mute", "message": e})
+            self.error.emit({"command": "set_mute", "message": str(e)})
     
     def set_volume(self, value):
         try:
@@ -216,7 +197,7 @@ class PlayerWindow(QMainWindow):
             self.rt_status()
             self.save_setup_to_file()
         except Exception as e:
-            self.error.emit({"command":"set_volume", "message":e})
+            self.error.emit({"command":"set_volume", "message":str(e)})
             
     def set_play_mode(self, mode):
         try:
@@ -224,7 +205,7 @@ class PlayerWindow(QMainWindow):
             self.rt_status()
             self.save_setup_to_file()
         except Exception as e:
-            self.error.emit({"command":"set_volume", "message":e})
+            self.error.emit({"command":"set_volume", "message":str(e)})
     
     def set_repeat_one(self, value):
         try:
@@ -232,7 +213,7 @@ class PlayerWindow(QMainWindow):
             self.rt_status()
             self.save_setup_to_file()
         except Exception as e:
-            self.error.emit({"command":"set_volume", "message":e})
+            self.error.emit({"command":"set_volume", "message":str(e)})
     
     def set_repeat_all(self, value):
         try:
@@ -240,7 +221,7 @@ class PlayerWindow(QMainWindow):
             self.rt_status()
             self.save_setup_to_file()
         except Exception as e:
-            self.error.emit({"command":"set_volume", "message":e})
+            self.error.emit({"command":"set_volume", "message":str(e)})
         
     def update_status(self):
         self._status['position'] = int(self.mediaplayer.get_position() * 1000)
@@ -252,10 +233,41 @@ class PlayerWindow(QMainWindow):
             if not self._status['paused']:
                 if self._status['repeat_one']:
                     self.stop()
-                    return self.play_pause()
+                    self.play_pause()
                 else:
                     self.stop()
+                    if self._status['play_mode'] == 'Playlist':
+                        self.playlist_index()
         self.rt_status()
+    
+    def playlist_play(self):
+        self.open_file(self.playlist[self._status['play_index']])
+        self.play_pause()
+        
+    def playlist_index(self):
+        if self._status['play_index'] == len(self.playlist) - 1:
+            self._status['play_index'] = 0
+            if not self._status["repeat_all"]:
+                self.stop()
+                return
+        else:
+            self._status["play_index"] = self._status["play_index"] + 1
+        self.open_file(self.playlist[self._status["play_index"]])
+        self.play_pause()
+    
+    def playlist_foward(self):
+        self._status["play_index"] = self._status["play_index"] + 1
+        if self._status['play_index'] == len(self.playlist) - 1:
+            self._status['play_index'] = 0
+        self.open_file(self.playlist[self._status["play_index"]])
+        self.play_pause()
+
+    def playlist_rewind(self):
+        self._status["play_index"] = self._status["play_index"] - 1
+        if self._status["play_index"] < 0:
+            self._status["play_index"] = 0
+        self.open_file(self.playlist[self._status["play_index"]])
+        self.play_pause()
         
     @Slot(object)
     def recv_comm(self, data):
@@ -266,11 +278,6 @@ class PlayerWindow(QMainWindow):
             self.stop()
         elif data["command"] == "open_file":
             self.open_file(data["file"])
-            self.play_pause()
-            self.timer.stop()
-            time.sleep(.1)
-            self.mediaplayer.pause()
-            self._status['paused'] = True
         elif data["command"] == "play_direct":
             self.open_file(data["file"])
             self.play_pause()
@@ -292,6 +299,10 @@ class PlayerWindow(QMainWindow):
             self.set_repeat_all(data["value"])
         elif data["command"] == "set_repeat_one":
             self.set_repeat_one(data["value"])
+        elif data["command"] == "set_ff":
+            self.playlist_foward()
+        elif data["command"] == "set_rew":
+            self.playlist_rewind()
         else:
             self.error.emit({ "command":"unknown_command", "command":"unknown_command" })
         # self.rt_status()

@@ -1,8 +1,8 @@
 {
 	"fullscreen": false,
-	"play_mode": "Normal",
+	"play_mode": "Playlist",
 	"volume": 100,
 	"mute": false,
-	"repeat_one": true,
-	"repeat_all": false
+	"repeat_one": false,
+	"repeat_all": true
 }
