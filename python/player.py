@@ -257,7 +257,7 @@ class PlayerWindow(QMainWindow):
     
     def playlist_foward(self):
         self._status["play_index"] = self._status["play_index"] + 1
-        if self._status['play_index'] == len(self.playlist) - 1:
+        if self._status['play_index'] >= len(self.playlist):
             self._status['play_index'] = 0
         self.open_file(self.playlist[self._status["play_index"]])
         self.play_pause()
@@ -277,8 +277,10 @@ class PlayerWindow(QMainWindow):
         elif data["command"] == "stop":
             self.stop()
         elif data["command"] == "open_file":
+            self._status["play_mode"] = "Normal"
             self.open_file(data["file"])
         elif data["command"] == "play_direct":
+            self._status["play_mode"] = "Normal"
             self.open_file(data["file"])
             self.play_pause()
         elif data["command"] == "set_fullscreen":
@@ -303,6 +305,17 @@ class PlayerWindow(QMainWindow):
             self.playlist_foward()
         elif data["command"] == "set_rew":
             self.playlist_rewind()
+        elif data["command"] == "play_id":
+            self._status["play_mode"] = "Playlist"
+            if data["index"] < 0:
+                # self._status["play_index"] = 0
+                return
+            if data["index"] >= len(self.playlist):
+                # self._status["play_index"] = 0
+                return
+            self._status["play_index"] = data["index"]
+            self.open_file(self.playlist[data["index"]])
+            self.play_pause()
         else:
             self.error.emit({ "command":"unknown_command", "command":"unknown_command" })
         # self.rt_status()

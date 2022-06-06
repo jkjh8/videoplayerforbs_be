@@ -4,6 +4,7 @@ const router = express.Router()
 const path = require('path')
 const fs = require('fs')
 const formidable = require('formidable')
+const encodeUTF16 = require('../../../api/encodeUTF16')
 
 /* GET users listing. */
 router.get('/', async (req, res) => {
@@ -21,7 +22,8 @@ router.get('/', async (req, res) => {
       directory: stat.isDirectory(),
       path: path.join(targetPath, r[i]),
       size: stat.size,
-      createdAt: stat.birthtime
+      createdAt: stat.birthtime,
+      amx: encodeUTF16(r[i])
     })
   }
   res.json({ dir: dir, files })
