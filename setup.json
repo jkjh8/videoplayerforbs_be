@@ -1,8 +1,10 @@
 {
 	"fullscreen": false,
-	"play_mode": "Playlist",
+	"play_mode": "Normal",
 	"volume": 100,
 	"mute": false,
 	"repeat_one": false,
-	"repeat_all": true
+	"repeat_all": true,
+	"rt_ipaddr": "",
+	"rt_port": 12302
 }

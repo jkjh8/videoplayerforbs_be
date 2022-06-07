@@ -45,7 +45,9 @@ class PlayerWindow(QMainWindow):
             "end_of_list": 0,
             "play_index": 0,
             "repeat_one": False,
-            "repeat_all": False
+            "repeat_all": False,
+            "rt_ipaddr": '',
+            "rt_port": 12302
         }
         self.playlist = []
         self.setupUi()
@@ -61,9 +63,10 @@ class PlayerWindow(QMainWindow):
                 "play_mode": self._status['play_mode'],
                 "volume": self._status['volume'],
                 "mute": self._status['mute'],
-                "play_mode": self._status['play_mode'],
                 "repeat_one": self._status['repeat_one'],
                 "repeat_all": self._status['repeat_all'],
+                "rt_ipaddr": self._status["rt_ipaddr"],
+                "rt_port": self._status['rt_port']
             }, make_file, indent="\t")
             
     def load_setup_from_file(self):
@@ -83,6 +86,10 @@ class PlayerWindow(QMainWindow):
                         self.set_repeat_all(json_data['repeat_all'])
                     if "repeat_one" in json_data:
                         self.set_repeat_one(json_data['repeat_one'])
+                    if "rt_ipaddr" in json_data:
+                        self._status["rt_ipaddr"] = json_data['rt_ipaddr']
+                    if "rt_port" in json_data:
+                        self._status["rt_port"] = json_data["rt_port"]
         except Exception as e:
             print(e)
     
@@ -271,7 +278,6 @@ class PlayerWindow(QMainWindow):
         
     @Slot(object)
     def recv_comm(self, data):
-        print(data)
         if data["command"] == "play_pause":
             self.play_pause()
         elif data["command"] == "stop":
@@ -316,6 +322,8 @@ class PlayerWindow(QMainWindow):
             self._status["play_index"] = data["index"]
             self.open_file(self.playlist[data["index"]])
             self.play_pause()
+        elif data["command"] == "set_rt_ipaddr":
+            self._status["rt_ipaddr"] = data["ipaddr"]
         else:
             self.error.emit({ "command":"unknown_command", "command":"unknown_command" })
         # self.rt_status()
@@ -332,7 +340,6 @@ class IO(QThread):
     def call_connect(self):
         self.connected = True
         self.get_connected.emit()
-        print('connected')
 
     def call_command(self, args):
         self.command.emit(args)
@@ -343,7 +350,6 @@ class IO(QThread):
         
     def call_disconnect(self):
         self.connected = False
-        print('disconnected')
     
     @Slot()
     def send_status(self, args):
