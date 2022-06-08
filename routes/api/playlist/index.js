@@ -1,12 +1,12 @@
 const express = require('express')
 const router = express.Router()
-
-const path = require('path')
 const fs = require('fs')
+
+global.playlist = []
 
 router.get('/', (req, res) => {
   try {
-    const playlist = []
+    playlist = []
     let pl
     if (fs.existsSync('./playlist.json')) {
       pl = JSON.parse(fs.readFileSync('./playlist.json', 'utf-8'))
@@ -14,18 +14,17 @@ router.get('/', (req, res) => {
     for (let i = 0; i < pl.length; i++) {
       playlist.push({ ...pl[i], exist: fs.existsSync(pl[i].path) })
     }
-    res.status(200).json({ playlist: playlist })
+    res.status(200).json({ playlist })
   } catch (err) {
-    console.log(err)
     res.status(500).json({ error: err })
   }
 })
 
 router.put('/', (req, res) => {
   try {
-    const { playlist } = req.body
+    playlist = req.body.playlist
     fs.writeFileSync('./playlist.json', JSON.stringify(playlist))
-    res.status(200).json({ playlist: playlist })
+    res.status(200).json({ playlist })
   } catch (err) {
     res.status(500).json({ error: err })
   }

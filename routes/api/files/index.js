@@ -66,7 +66,6 @@ router.get('/mkdir', (req, res) => {
 router.get('/deleteFile', (req, res) => {
   try {
     const { name } = req.query
-    console.log(path.join(mediaFolder, name))
     fs.unlinkSync(path.join(mediaFolder, name))
     res.status(200).send('OK')
   } catch (err) {

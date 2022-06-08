@@ -1,8 +1,8 @@
 import vlc
 import sys, os, platform, json, time
 from PySide2.QtWidgets import QApplication, QWidget, QMainWindow
-from PySide2.QtCore import Slot, Signal, QThread, QTimer
-from PySide2.QtGui import QIcon
+from PySide2.QtCore import Slot, Signal, QThread, QTimer, Qt
+from PySide2.QtGui import QIcon, QCursor, QPixmap
 import socketio
 
 #  status codes
@@ -17,6 +17,7 @@ import socketio
  
 class PlayerWindow(QMainWindow):
     sender = Signal(object); status = Signal(object); error = Signal(object); message = Signal(object)
+    rt_playlist = Signal(list)
     def __init__(self, master=None):
         QMainWindow.__init__(self, master)
         self.setWindowTitle("Video Player For BS")
@@ -30,6 +31,7 @@ class PlayerWindow(QMainWindow):
         self.io.get_connected.connect(self.rt_status)
         self.timer.timeout.connect(self.update_status)
         self.status.connect(self.io.send_status)
+        self.rt_playlist.connect(self.io.send_playlist)
         self.message.connect(self.io.send_message)
         self.error.connect(self.io.send_error)
         self.io.start()
@@ -48,8 +50,9 @@ class PlayerWindow(QMainWindow):
             "play_index": 0,
             "repeat_one": False,
             "repeat_all": False,
-            "rt_ipaddr": '',
-            "rt_port": 12302
+            "rt_ipaddr": '0.0.0.0',
+            "rt_port": 12302,
+            "rt_type": 'AMX'
         }
         self.playlist = []
         self.setupUi()
@@ -68,7 +71,8 @@ class PlayerWindow(QMainWindow):
                 "repeat_one": self._status['repeat_one'],
                 "repeat_all": self._status['repeat_all'],
                 "rt_ipaddr": self._status["rt_ipaddr"],
-                "rt_port": self._status['rt_port']
+                "rt_port": self._status['rt_port'],
+                "rt_type": self._status['rt_type']
             }, make_file, indent="\t")
             
     def load_setup_from_file(self):
@@ -77,21 +81,29 @@ class PlayerWindow(QMainWindow):
                 with open('./setup.json', 'r',  encoding='UTF8') as f:
                     json_data = json.load(f)
                     if 'fullscreen' in json_data:
-                        self.set_fullscreen(json_data['fullscreen'])
+                        self._status["fullscreen"] = json_data['fullscreen']
                     if 'play_mode' in json_data:
-                        self.set_play_mode(json_data['play_mode'])
+                        self._status["play_mode"] = json_data["play_mode"]
                     if "volume" in json_data:
-                        self.set_volume(json_data['volume'])
+                        self._status["volume"] = json_data["volume"]
                     if "mute" in json_data:
-                        self.set_mute(json_data['mute'])
+                        self._status["mute"] = json_data["mute"]
                     if "repeat_all" in json_data:
-                        self.set_repeat_all(json_data['repeat_all'])
+                        self._status["repeat_all"] = json_data["repeat_all"]
                     if "repeat_one" in json_data:
-                        self.set_repeat_one(json_data['repeat_one'])
+                        self._status["repeat_one"] = json_data["repeat_one"]
                     if "rt_ipaddr" in json_data:
                         self._status["rt_ipaddr"] = json_data['rt_ipaddr']
                     if "rt_port" in json_data:
                         self._status["rt_port"] = json_data["rt_port"]
+                    if "rt_type" in json_data:
+                        self._status["rt_type"] = json_data["rt_type"]
+                    self.set_fullscreen(self._status['fullscreen'])
+                    self.set_repeat_one(self._status['repeat_one'])
+                    self.set_mute(self._status['mute'])
+                    self.set_repeat_all(self._status['repeat_all'])
+                    self.set_volume(self._status['volume'])
+                    self.set_play_mode(self._status['play_mode'])
         except Exception as e:
             print(e)
     
@@ -103,6 +115,7 @@ class PlayerWindow(QMainWindow):
     def update_playlist(self, plist):
         self.playlist = plist
         self._status['end_of_list'] = len(plist)
+        self.rt_playlist.emit(plist)
 
     def setupUi(self):
         self.setWindowIcon(QIcon('./python/logo.png'))
@@ -195,8 +208,10 @@ class PlayerWindow(QMainWindow):
             self._status['fullscreen'] = value
             if (value == True):
                 self.showFullScreen()
+                self.setCursor(Qt.BlankCursor)
             else:
                 self.showNormal()
+                self.setCursor(Qt.ArrowCursor)
             self.rt_status()
             self.save_setup_to_file()
         except Exception as e:
@@ -239,6 +254,13 @@ class PlayerWindow(QMainWindow):
     def set_repeat_all(self, value):
         try:
             self._status["repeat_all"] = value
+            self.rt_status()
+            self.save_setup_to_file()
+        except Exception as e:
+            self.error.emit({"command":"set_volume", "message":str(e)})
+    def set_rt_type(self, value):
+        try:
+            self._status["rt_type"] = value
             self.rt_status()
             self.save_setup_to_file()
         except Exception as e:
@@ -311,6 +333,9 @@ class PlayerWindow(QMainWindow):
     def recv_comm(self, data):
         print(data)
         if data["command"] == "play_pause":
+            if self._status["play_mode"] == "Playlist":
+                self.playlist_play()
+                return
             self.play_pause()
         elif data["command"] == "stop":
             self.stop()
@@ -363,6 +388,16 @@ class PlayerWindow(QMainWindow):
             # self.play_pause()
         elif data["command"] == "set_rt_ipaddr":
             self._status["rt_ipaddr"] = data["ipaddr"]
+            self.save_setup_to_file()
+            self.rt_status()
+        elif data["command"] == "set_rt_port":
+            self._status["rt_port"] = int(data["port"])
+            self.save_setup_to_file()
+            self.rt_status()
+        elif data["command"] == "get_playlist":
+            self.rt_playlist.emit(self.playlist)
+        elif data["command"] == "set_rt_type":
+            self.set_rt_type(data["value"])
         else:
             self.error.emit({ "command":"unknown_command", "command":"unknown_command" })
         # self.rt_status()
@@ -394,6 +429,13 @@ class IO(QThread):
     def send_status(self, args):
         if self.connected:
             IO.sio.emit('status', args)
+        else:
+            print('socket io not connected')
+    
+    @Slot()
+    def send_playlist(self, pl):
+        if self.connected:
+            IO.sio.emit('playlist', pl)
         else:
             print('socket io not connected')
     

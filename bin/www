@@ -22,7 +22,7 @@ app.set('port', port)
 var server = http.createServer(app)
 
 // socket.io
-app.io.attach(server, {
+io.attach(server, {
   cors: {
     origin: [
       'http://localhost:8080',

@@ -4,7 +4,7 @@ const createError = require('http-errors')
 const express = require('express')
 const path = require('path')
 const cookieParser = require('cookie-parser')
-const logger = require('morgan')
+// const logger = require('morgan')
 const cors = require('cors')
 const fs = require('fs')
 
@@ -13,7 +13,7 @@ const apiRouter = require('./routes/api')
 
 const app = express()
 
-app.use(logger('dev'))
+// app.use(logger('dev'))
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
@@ -38,8 +38,8 @@ app.use(
 )
 
 // socket io
-app.io = require('socket.io')()
-require('./api/socketio')(app.io)
+global.io = require('socket.io')()
+require('./api/socketio')(io)
 
 app.use('/', indexRouter)
 app.use('/api', apiRouter)
@@ -60,4 +60,5 @@ app.use(function (req, res, next) {
 //   res.render('error')
 // })
 require('./python')
+require('./api/udp')
 module.exports = app

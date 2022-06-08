@@ -1,0 +1,1 @@
+"use strict";(self["webpackChunkvideoplayerforbs"]=self["webpackChunkvideoplayerforbs"]||[]).push([[796],{6796:(e,n,r)=>{r.r(n),r.d(n,{default:()=>d});var s=r(9835);const a={name:"VideoPage",setup(e){return(e,n)=>{const r=(0,s.up)("q-page");return(0,s.wg)(),(0,s.j4)(r)}}};var o=r(9885),t=r(2857),p=r(9984),u=r.n(p);const c=a,d=c;u()(a,"components",{QPage:o.Z,QIcon:t.Z})}}]);

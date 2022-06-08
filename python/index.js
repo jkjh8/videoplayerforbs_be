@@ -14,7 +14,7 @@ function playerOpen() {
 
   child.on('exit', () => {
     console.log('exit player process and reopen player')
-    // playerOpen()
+    playerOpen()
   })
 }
 
