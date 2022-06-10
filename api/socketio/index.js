@@ -1,4 +1,5 @@
 global._status = {}
+const { syncPlaylist } = require('../../api/udp')
 
 exports = module.exports = () => {
   io.on('connection', (socket) => {
@@ -23,6 +24,7 @@ exports = module.exports = () => {
     })
     socket.on('playlist', (list) => {
       playlist = list
+      syncPlaylist()
     })
     socket.on('command', (args) => {
       console.log(args)

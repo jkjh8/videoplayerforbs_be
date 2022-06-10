@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const fs = require('fs')
+const { syncPlaylist } = require('../../../api/udp')
 
 global.playlist = []
 
@@ -25,6 +26,15 @@ router.put('/', (req, res) => {
     playlist = req.body.playlist
     fs.writeFileSync('./playlist.json', JSON.stringify(playlist))
     res.status(200).json({ playlist })
+  } catch (err) {
+    res.status(500).json({ error: err })
+  }
+})
+
+router.get('/sync', (req, res) => {
+  try {
+    syncPlaylist()
+    res.status(200).send('OK')
   } catch (err) {
     res.status(500).json({ error: err })
   }

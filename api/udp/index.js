@@ -68,13 +68,7 @@ server.on('message', (msg, remote) => {
         io.to('player').emit('command', { command: 'set_rew' })
         break
       case 'getvideolist':
-        let rt
-        if (_status.rt_type === 'AMX') {
-          rt = playlist.map((e) => e.amx).join(',')
-        } else {
-          rt = playlist.map((e) => e.name).join(',')
-        }
-        sendUdpMsg(`getvideolist_full,${rt}`)
+        syncPlaylist()
         break
     }
   } catch (err) {
@@ -98,4 +92,17 @@ function sendUdpMsg(msg) {
   }
 }
 
+function syncPlaylist() {
+  console.log('sync')
+  let rt
+  if (_status.rt_type === 'AMX') {
+    rt = playlist.map((e) => e.amx).join(',')
+  } else {
+    rt = playlist.map((e) => e.name).join(',')
+  }
+  sendUdpMsg(`getvideolist_full,${rt}`)
+}
+
 server.bind(12302, '0.0.0.0')
+
+module.exports = { syncPlaylist, sendUdpMsg }
